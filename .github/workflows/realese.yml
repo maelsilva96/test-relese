@@ -1,0 +1,74 @@
+name: build
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+*'
+    
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  check:
+    name: "Config"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v3
+
+      - name: Get tag message
+        id: get-tag-message
+        run: |
+            TAG_MESSAGE=$(git for-each-ref --format='%(contents)' $(git rev-parse --symbolic-full-name ${GITHUB_REF}))
+            echo "::set-output name=tag_message::$TAG_MESSAGE"
+    
+  build:
+    name: "Build project"
+    runs-on: ubuntu-latest
+    strategy:
+        matrix:
+          include:
+            - {goos: "freebsd", goarch: "386"}
+            - {goos: "freebsd", goarch: "amd64"}
+            - {goos: "freebsd", goarch: "arm"}
+            - {goos: "linux", goarch: "386"}
+            - {goos: "linux", goarch: "amd64"}
+            - {goos: "linux", goarch: "arm"}
+            - {goos: "linux", goarch: "arm64"}
+            - {goos: "openbsd", goarch: "386"}
+            - {goos: "openbsd", goarch: "amd64"}
+            - {goos: "solaris", goarch: "amd64"}
+            - {goos: "windows", goarch: "386"}
+            - {goos: "windows", goarch: "amd64"}
+            - {goos: "darwin", goarch: "amd64"}
+            - {goos: "darwin", goarch: "arm64"}
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.22
+      
+      - name: Build the project
+        id: build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+            GOOS=${{ matrix.goos }}
+            GOARCH=${{ matrix.goarch }}
+            output_name="test-release-${GOOS}-${GOARCH}"
+            go build -o $output_name .
+            echo "::set-output name=artifact::$output_name"
+    
+      - name: Archive the artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ steps.build.outputs.artifact }}
+          path: ${{ steps.build.outputs.artifact }}
